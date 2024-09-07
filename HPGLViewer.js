@@ -266,27 +266,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // CAD utilities.
   function getPaths(contents) {
-    const lines = contents.split('\n');
+    const lines = contents.split(';');
     let currentColorCode = 0;
     let feedLength = 0;
     let feedCount = 0;
+    let plotRelative = false;
     paths.totalPointCount = 0;
     paths.pathCount = 0;
 
-    for (let i = 0; i < lines.length; i++)
-    {
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      const parms = line.split(/[PUDNSFL,;]/);
-      
-      if (line[0] === 'S' && line[1] === 'P')
-      {
+      const parms = line.split(/[INSPSURDF,]/);
+      //console.log(parms)
+
+      // select pen
+      if (line[0] === 'S' && line[1] === 'P') {
         currentColorCode = parms[2];
       }
-      else if (line[0] === 'P' && line[1] === 'U' && line[2] != ';')
-      {
-        const x = parseInt(parms[2]);
-        const y = parseInt(parms[3]);
+      // plot relative
+      if (line[0] === "P" && line[1] === "R") {
+        console.log('plot relative')
+        plotRelative = true;
+      }
+      // plot absolute
+      if (line[0] === "P" && line[1] === "A") {
+        console.log("plot absolute")
+        plotRelative = false;
+      }
 
+      // pen up, end path
+      else if (line[0] === 'P' && line[1] === 'U' && line[2] != ';') {
+        let x = parseInt(parms[2]);
+        let y = parseInt(parms[3]);
+        console.log("pen up", x, y, paths.pathCount)
+        if (plotRelative) {
+          if (paths.totalPointCount > 0) {
+            x = paths.x[paths.totalPointCount - 1] + x
+            y = paths.y[paths.totalPointCount - 1] + y
+            console.log(paths.totalPointCount, paths.x[paths.totalPointCount - 1], paths.y[paths.totalPointCount - 1], x, y)
+          }
+        }
         paths.pathCount++;
         paths.x[paths.totalPointCount] = x;
         paths.y[paths.totalPointCount] = y;
@@ -294,15 +313,25 @@ document.addEventListener('DOMContentLoaded', function() {
         paths.pointCounts[paths.pathCount - 1] = 1;
         paths.colorCode[paths.pathCount - 1] = currentColorCode;
       }
-      else if (line[0] === 'P' && line[1] === 'D' && line[2] != ';')
-      {
-        const x = parseInt(parms[2]);
-        const y = parseInt(parms[3]);
-        
-        paths.x[paths.totalPointCount] = x;
-        paths.y[paths.totalPointCount] = y;
-        paths.feedLength[paths.totalPointCount++] = feedLength;
-        paths.pointCounts[paths.pathCount - 1]++;
+
+      // pen down, start path
+      else if (line[0] === 'P' && line[1] === 'D' && line[2] != ';') {
+        for (j = 2; j < (parms.length); j += 2) {
+          let x = parseInt(parms[j]);
+          let y = parseInt(parms[j + 1]);
+          if (plotRelative) {
+            if (paths.totalPointCount > 0) {
+              console.log(paths.totalPointCount, paths.x[paths.totalPointCount - 1], paths.y[paths.totalPointCount - 1], x, y)
+              x = paths.x[paths.totalPointCount - 1] + x
+              y = paths.y[paths.totalPointCount - 1] + y
+            }
+          }
+          paths.x[paths.totalPointCount] = x;
+          paths.y[paths.totalPointCount] = y;
+          paths.feedLength[paths.totalPointCount++] = feedLength;
+          paths.pointCounts[paths.pathCount - 1]++;
+        }
+
       }
       else if (line[0] === 'F' && line[1] === 'L' && line[2] != ';') {
         feedLength += parseInt(parms[2]);
